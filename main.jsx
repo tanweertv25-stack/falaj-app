@@ -1,7 +1,9 @@
-export default function App() {
-  return (
-    <div>
-      <h1>الموقع يعمل الآن ✅</h1>
-    </div>
-  )
-}
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import App from './App.jsx'
+
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>,
+)

@@ -1,16 +1,7 @@
 export default function App() {
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'center',
-      background: '#0f172a',
-      color: 'white',
-      fontSize: '30px',
-      fontWeight: 'bold'
-    }}>
-      نظام إدارة الفلج يعمل بنجاح ✅
+    <div>
+      <h1>الموقع يعمل الآن ✅</h1>
     </div>
   )
 }

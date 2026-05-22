@@ -2,9 +2,14 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>نظام فلج - إدارة جداول السقي</title>
     <meta name="description" content="نظام إلكتروني متكامل لإدارة جداول السقي في الأفلاج التقليدية">
+    
+    <!-- PWA -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0f172a">
+    <link rel="apple-touch-icon" href="icon.svg">
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -161,10 +166,25 @@
         .prayer-item { background: var(--bg-2); border: 1px solid var(--border-light); border-radius: 12px; padding: 12px; text-align: center; }
         .prayer-name { font-size: 13px; color: var(--text-muted); font-weight: 700; margin-bottom: 4px; }
         .prayer-time { font-family: 'JetBrains Mono', monospace; font-size: 18px; color: var(--text); font-weight: 700; direction: ltr;}
+
+        .dict-item { background: var(--bg-2); padding: 16px; border-radius: 12px; border: 1px solid var(--border-light); margin-bottom: 12px; }
+        .dict-term { font-size: 16px; font-weight: 800; color: var(--text); margin-bottom: 4px; display: flex; align-items: center; gap: 8px;}
+        .dict-term::before { content: ''; width: 6px; height: 6px; background: var(--primary); border-radius: 50%; }
+        .dict-desc { font-size: 14px; color: var(--text-muted); padding-right: 14px; }
     </style>
 </head>
 <body>
     <div id="root"></div>
+
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js').catch(err => {
+                    console.log('ServiceWorker registration failed: ', err);
+                });
+            });
+        }
+    </script>
 
     <script type="text/babel">
         const { useState, useEffect, useMemo, useCallback, useRef } = React;
@@ -192,7 +212,8 @@
             Next: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 8 16 12 12 16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>,
             Coffee: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>,
             Wrench: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>,
-            Send: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            Send: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>,
+            Book: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
         };
 
         const DAYS = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
@@ -262,6 +283,9 @@
             // Tools State
             const [swapForm, setSwapForm] = useState({ me:"", other:"", reason:"" });
             const [prayerTimes, setPrayerTimes] = useState(null);
+            
+            // PWA Install Prompt State
+            const [deferredPrompt, setDeferredPrompt] = useState(null);
 
             // Time updater
             useEffect(() => {
@@ -273,6 +297,25 @@
             useEffect(() => { try { localStorage.setItem("falaj-v5", JSON.stringify(records)); } catch(e) {} }, [records]);
             // Save subs
             useEffect(() => { try { localStorage.setItem("falaj-subs", JSON.stringify(subs)); } catch(e) {} }, [subs]);
+
+            // PWA Install Event Listener
+            useEffect(() => {
+                window.addEventListener('beforeinstallprompt', (e) => {
+                    e.preventDefault();
+                    setDeferredPrompt(e);
+                });
+            }, []);
+
+            const handleInstallClick = () => {
+                if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                    deferredPrompt.userChoice.then((choiceResult) => {
+                        if (choiceResult.outcome === 'accepted') {
+                            setDeferredPrompt(null);
+                        }
+                    });
+                }
+            };
 
             const showNotif = useCallback((msg, type='success') => {
                 setNotification({ msg, type });
@@ -361,12 +404,12 @@
                     if (minsUntil === 15 && !lastNotifiedRef.current[sid + '-15']) {
                         lastNotifiedRef.current[sid + '-15'] = true;
                         playBeep();
-                        new Notification("تنبيه الفلج", { body: `دورك (${r.raddahName}) سيبدأ بعد 15 دقيقة!`, icon: '/favicon.ico' });
+                        new Notification("تنبيه الفلج", { body: `دورك (${r.raddahName}) سيبدأ بعد 15 دقيقة!`, icon: 'icon.svg' });
                     }
                     if (minsUntil === 0 && msUntil > 0 && msUntil < 2000 && !lastNotifiedRef.current[sid + '-0']) {
                         lastNotifiedRef.current[sid + '-0'] = true;
                         playBeep();
-                        new Notification("حان وقت السقي!", { body: `بدأ دورك الآن (${r.raddahName})، بالتوفيق.`, icon: '/favicon.ico' });
+                        new Notification("حان وقت السقي!", { body: `بدأ دورك الآن (${r.raddahName})، بالتوفيق.`, icon: 'icon.svg' });
                     }
                 });
             }, [now, subs, processedRecords]);
@@ -380,9 +423,34 @@
 
             /* ── Form Handlers ── */
             const handleSave = () => {
-                if (!form.name.trim() || !form.number || !form.date || !form.time || !form.day || !form.raddahName.trim()) {
-                    showNotif("يرجى تعبئة جميع الحقول", 'error'); return;
+                if (!form.name.trim() || !form.number || !form.date || !form.time || !form.day || !form.raddahName.trim() || !form.athar) {
+                    showNotif("يرجى تعبئة جميع الحقول بما فيها 'كم أثر'", 'error'); return;
                 }
+                
+                // --- Collision Detection ---
+                const newStartDt = new Date(`${form.date}T${form.time}:00`);
+                const newStartMs = newStartDt.getTime();
+                const atharVal = parseFloat(form.athar);
+                
+                if (!atharVal || atharVal <= 0) {
+                    showNotif("يجب إدخال عدد الآثار بشكل صحيح", 'error'); return;
+                }
+                
+                const newEndMs = newStartMs + (atharVal * 30 * 60 * 1000); // 30 mins per Athar
+                
+                // Check if overlapping with any existing processed record
+                const isOverlap = processedRecords.some(r => {
+                    if (editingId === r.id) return false; // Ignore self when editing
+                    // Overlap logic: newStart < existingEnd AND newEnd > existingStart
+                    return (newStartMs < r.endMs && newEndMs > r.startMs);
+                });
+                
+                if (isOverlap) {
+                    showNotif("تنبيه للإدارة: لا يمكن الإضافة، هذا الوقت يتداخل مع سقية أخرى مسجلة مسبقاً!", 'error');
+                    return;
+                }
+                // ---------------------------
+
                 if (editingId) {
                     setRecords(records.map(r => r.id === editingId ? { ...form, id: editingId } : r));
                     showNotif("تم تحديث السجل بنجاح");
@@ -400,6 +468,17 @@
                 const tableRows = processedRecords.filter(r => r.startMs >= (status.current?.startMs ?? now.getTime()));
                 return (
                     <div className="animate-in">
+                        {/* Install Prompt for PWA */}
+                        {deferredPrompt && (
+                            <div style={{background: 'var(--primary-glow)', border: '1px solid var(--primary)', borderRadius: '12px', padding: '16px', marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px'}}>
+                                <div>
+                                    <strong style={{display: 'block', color: 'var(--text)'}}>تثبيت التطبيق 📱</strong>
+                                    <span style={{fontSize: '13px', color: 'var(--text-muted)'}}>قم بتثبيت التطبيق على هاتفك للوصول السريع بدون متصفح.</span>
+                                </div>
+                                <button className="btn btn-primary" onClick={handleInstallClick}>تثبيت الآن</button>
+                            </div>
+                        )}
+                        
                         {/* Big Clock */}
                         <div className="big-clock-wrap">
                             <div className="big-clock-time" style={{display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: '8px'}}>
@@ -568,6 +647,27 @@
                         </div>
 
                         <div className="tool-card">
+                            <h3 style={{fontSize:18,fontWeight:800,marginBottom:16,display:'flex',alignItems:'center',gap:8}}><Ic.Book style={{width:18,height:18,color:'var(--success)'}}/> دليل مصطلحات الفلج</h3>
+                            <p style={{color:'var(--text-muted)',fontSize:14,marginBottom:16}}>تعرف على أهم المصطلحات التقليدية المستخدمة في نظام سقي الأفلاج:</p>
+                            <div className="dict-item">
+                                <div className="dict-term">الأثر</div>
+                                <div className="dict-desc">هو وحدة قياس الوقت التقليدية في الأفلاج العمانية، وكل (أثر) يعادل بالضبط 30 دقيقة. (نصف ساعة).</div>
+                            </div>
+                            <div className="dict-item">
+                                <div className="dict-term">الردّة / البادة</div>
+                                <div className="dict-desc">هي الحصة الكاملة المخصصة للشخص أو للمزرعة من ماء الفلج خلال الدورة (النهار أو الليل).</div>
+                            </div>
+                            <div className="dict-item">
+                                <div className="dict-term">وكيل الفلج</div>
+                                <div className="dict-desc">هو المسؤول الأول عن إدارة شؤون الفلج وتوزيع حصص المياه وحل النزاعات والإشراف على أعمال الصيانة.</div>
+                            </div>
+                            <div className="dict-item">
+                                <div className="dict-term">القعّادة</div>
+                                <div className="dict-desc">هي الفترة الزمنية أو اليوم المخصص للبيع أو تأجير حصص الماء للمساهمة في صيانة الفلج وإصلاحه.</div>
+                            </div>
+                        </div>
+
+                        <div className="tool-card">
                             <h3 style={{fontSize:18,fontWeight:800,marginBottom:16,display:'flex',alignItems:'center',gap:8}}><Ic.Sun style={{width:18,height:18,color:'var(--warning)'}}/> مواقيت مرتبطة بالشمس</h3>
                             <p style={{color:'var(--text-muted)',fontSize:14}}>يُعتمد على الشروق والغروب ومواقيت الصلاة في تحديد وتوزيع حصص الماء التقليدية.</p>
                             {prayerTimes && (
@@ -609,7 +709,7 @@
                                 <div className="form-group"><label className="form-label">الاسم</label><input className="form-input" value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/></div>
                                 <div className="form-group"><label className="form-label">الردة</label><input className="form-input" placeholder="اسم الردة" value={form.raddahName} onChange={e=>setForm({...form,raddahName:e.target.value})}/></div>
                                 <div className="form-group"><label className="form-label">الرقم</label><input className="form-input" type="number" value={form.number} onChange={e=>setForm({...form,number:e.target.value})}/></div>
-                                <div className="form-group"><label className="form-label">كم أثر؟</label><input className="form-input" type="number" step="0.5" placeholder="مثال: 2 (لتعني ساعة واحدة)" value={form.athar} onChange={e=>setForm({...form,athar:e.target.value})}/></div>
+                                <div className="form-group"><label className="form-label">كم أثر؟ (الأثر = 30 دقيقة)</label><input className="form-input" type="number" step="0.5" placeholder="مثال: 2 (لتعني ساعة واحدة)" value={form.athar} onChange={e=>setForm({...form,athar:e.target.value})}/></div>
                                 <div className="form-group"><label className="form-label">اليوم</label><select className="form-select" value={form.day} onChange={e=>setForm({...form,day:e.target.value})}><option value="" disabled>اختر</option>{DAYS.map(d=><option key={d}>{d}</option>)}</select></div>
                                 <div className="form-group"><label className="form-label">التاريخ</label><input className="form-input" type="date" value={form.date} onChange={e=>setForm({...form,date:e.target.value})}/></div>
                                 <div className="form-group">
